@@ -88,6 +88,9 @@ index=main EventCode=4625
 | Remote Services: RDP | T1021.001 | Vecteur d'accès distant ciblé |
 
 📸 Voir [`screenshots/search-4625-bruteforce.png`](screenshots/search-4625-bruteforce.png)
+📸 Voir [`screenshots/search-4625-bruteforce.png`](screenshots/search-4625-bruteforce-details1.png)
+📸 Voir [`screenshots/search-4625-bruteforce.png`](screenshots/search-4625-bruteforce-details2.png)
+
 
 ## 📸 Captures d'écran
 
@@ -105,4 +108,4 @@ Voir [`screenshots/`](screenshots/) pour les captures de configuration et de das
 - [MITRE ATT&CK](https://attack.mitre.org)
 
 ---
-*Projet personnel dans le cadre de ma préparation aux certifications SOC Analyst (TryHackMe SOC Level 1, Splunk Core Power User, CySA+).*
+*Projet personnel*
