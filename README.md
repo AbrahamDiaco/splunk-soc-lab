@@ -88,9 +88,33 @@ index=main EventCode=4625
 | Remote Services: RDP | T1021.001 | Vecteur d'accès distant ciblé |
 
 📸 Voir [`screenshots/search-4625-bruteforce.png`](screenshots/search-4625-bruteforce.png)
-📸 Voir [`screenshots/search-4625-bruteforce.png`](screenshots/search-4625-bruteforce-details1.png)
-📸 Voir [`screenshots/search-4625-bruteforce.png`](screenshots/search-4625-bruteforce-details2.png)
 
+## 🎯 Démo : Détection d'un scan Nmap
+
+### Attaque (depuis Kali)
+```bash
+nmap -sS -T4 -p- 192.168.1.77
+```
+*Prérequis : activer `auditpol /set /subcategory:"Connexion de la plateforme de filtrage" /success:enable /failure:enable` sur Windows*
+
+### Détection (Splunk Web)
+```spl
+index=main (EventCode=5156 OR EventCode=5157) earliest=-15m
+| stats dc(Port_de_destination) as ports_scanned count by Adresse_source
+| where ports_scanned > 20
+```
+
+### Résultat observé
+| Adresse_source | ports_scanned | count |
+|---|---|---|
+| 192.168.1.77 | 45 573 | 78 367 |
+
+### Mapping MITRE ATT&CK
+| Technique | ID | Description |
+|---|---|---|
+| Network Service Scanning | T1046 | Scan de reconnaissance complet des ports TCP |
+
+📸 Voir [`screenshots/search-nmap-scan.png`](screenshots/search-nmap-scan.png)
 
 ## 📸 Captures d'écran
 
