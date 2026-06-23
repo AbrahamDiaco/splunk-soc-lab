@@ -48,6 +48,11 @@ Voir [`configs/inputs.conf`](configs/inputs.conf) — collecte des journaux d'é
 | Hydra : "account not active for remote desktop" | Mauvais nom de compte (`admin` au lieu du compte réel `lenovo`) + compte non membre du groupe Bureau à distance | Identification du compte réel via `net user`, ajout au groupe local (nom localisé en FR : "Utilisateurs du Bureau à distance") |
 | Hydra bloqué malgré bon compte/groupe | NLA (Network Level Authentication) empêchait la négociation d'atteindre l'étape de vérification du mot de passe | Désactivation temporaire du NLA (`UserAuthentication = 0` dans le registre) + redémarrage machine, puis réactivation après le test |
 | Timestamps des événements ne correspondaient pas à l'attaque en cours | Anciens événements de tests précédents affichés par défaut | Filtrage avec `earliest=-30m` pour isoler les événements récents |
+| Lien de téléchargement Universal Forwarder en 404 | Placeholder `<VERSION>` non remplacé par le numéro de version + hash de build réel | Récupération du lien exact depuis la page officielle Splunk (génère un wget avec hash unique par build) |
+| Sysmon installé mais aucun event récent dans `Get-WinEvent` | Service Sysmon64 arrêté (`State=Stopped`) après une instabilité | `Start-Service Sysmon64` |
+| Sysmon tourne, génère des events Windows, mais rien dans `index=main` | Forwarder jamais redémarré depuis l'ajout de la stanza `WinEventLog://Microsoft-Windows-Sysmon/Operational` dans `inputs.conf` | Redémarrage complet du service forwarder (`splunk restart`) |
+| Recherche `EventCode=1` sur Sysmon ne renvoie rien | Sourcetype Sysmon (`XmlWinEventLog`) n'extrait pas `EventCode`/`CommandLine` automatiquement sans Technology Add-on | Extraction manuelle via `rex` sur le XML brut, ou installation du Splunk Add-on for Sysmon |
+| Recherche `Image="*powershell*"` noyée de résultats non pertinents | Process internes Splunk (`splunk-powershell.exe`) très fréquents (~7s) matchent aussi le filtre | Filtrage plus précis sur le contenu de `CommandLine` (ex: `*EncodedCommand*`) plutôt que sur `Image` seul |
 
 ## 🔍 Recherches SPL utiles
 
@@ -116,6 +121,46 @@ index=main (EventCode=5156 OR EventCode=5157) earliest=-15m
 
 📸 Voir [`screenshots/search-nmap-scan.png`](screenshots/search-nmap-scan.png)
 
+## 🎯 Démo : Détection d'une commande PowerShell encodée (Sysmon)
+
+### Installation de Sysmon
+```powershell
+Invoke-WebRequest -Uri "https://download.sysinternals.com/files/Sysmon.zip" -OutFile "C:\Sysmon.zip"
+Expand-Archive -Path "C:\Sysmon.zip" -DestinationPath "C:\Sysmon"
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/SwiftOnSecurity/sysmon-config/master/sysmonconfig-export.xml" -OutFile "C:\Sysmon\sysmonconfig-export.xml"
+cd C:\Sysmon
+.\Sysmon64.exe -accepteula -i sysmonconfig-export.xml
+```
+
+### Attaque simulée
+```powershell
+$cmd = 'Write-Host "Test Sysmon detection"; Get-Process | Select-Object -First 3'
+$bytes = [System.Text.Encoding]::Unicode.GetBytes($cmd)
+$encoded = [Convert]::ToBase64String($bytes)
+powershell.exe -EncodedCommand $encoded
+```
+
+### Détection (Splunk Web)
+```spl
+index=main sourcetype="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational" earliest=-20m
+| rex field=_raw "<EventID>(?<EventID>\d+)</EventID>"
+| rex field=_raw "Name='Image'>(?<Image>[^<]+)"
+| rex field=_raw "Name='CommandLine'>(?<CommandLine>[^<]*)"
+| search EventID=1 CommandLine="*EncodedCommand*"
+| table _time, Image, CommandLine
+```
+
+### Résultat observé
+Commande capturée : `powershell.exe -EncodedCommand <Base64>` — technique d'évasion classique détectée malgré l'obfuscation.
+
+### Mapping MITRE ATT&CK
+| Technique | ID | Description |
+|---|---|---|
+| Command and Scripting Interpreter: PowerShell | T1059.001 | Exécution de code via PowerShell |
+| Obfuscated Files or Information | T1027 | Commande encodée en Base64 pour échapper à la détection naïve |
+
+📸 Voir [`screenshots/search-powershell-encoded.png`](screenshots/search-powershell-encoded.png)
+
 ## 📸 Captures d'écran
 
 Voir [`screenshots/`](screenshots/) pour les captures de configuration et de dashboards.
@@ -123,9 +168,10 @@ Voir [`screenshots/`](screenshots/) pour les captures de configuration et de das
 ## 🛠️ Stack technique
 - Splunk Enterprise (Free tier, <500MB/jour)
 - Splunk Universal Forwarder (Windows + Linux)
+- Sysmon (v15.21) avec configuration SwiftOnSecurity
 - Windows 10/11 natif (cible + indexeur)
 - VM Kali Linux (forwarder + outils d'attaque)
-- Hydra (simulation brute force RDP)
+- Hydra (simulation brute force RDP), Nmap (scan de reconnaissance)
 
 ## 📚 Liens utiles
 - [Documentation officielle Splunk](https://docs.splunk.com)
